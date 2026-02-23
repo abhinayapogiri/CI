@@ -1,0 +1,54 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Start the web app
+      run: |
+        npm start &
+        echo "Waiting for app to start..."
+        sleep 3
+
+    - name: Check UI endpoint with curl
+      run: |
+        echo "Checking home page..."
+        curl -v http://localhost:3000/
+        echo ""
+        echo "Checking health API..."
+        curl -v http://localhost:3000/api/health
+
+    - name: Verify successful response
+      run: |
+        echo "Verifying app is responding..."
+        RESPONSE=$(curl -s http://localhost:3000/api/health)
+        if echo "$RESPONSE" | grep -q "ok"; then
+          echo "✓ App is healthy!"
+          echo "Response: $RESPONSE"
+        else
+          echo "✗ Health check failed"
+          exit 1
+        fi
+
+    - name: Kill the app process
+      run: pkill -f "node app.js" || true
